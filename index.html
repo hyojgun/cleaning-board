@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>청소판</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 20px;
+            background-color: #fdfdfd;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #d1d1d1;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        td.selected {
+            background-color: #cce7ff;
+        }
+        .add-person {
+            margin-bottom: 15px;
+        }
+        .add-person label {
+            margin-right: 10px;
+        }
+        .add-person input[type="text"] {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .add-person button {
+            padding: 6px 12px;
+            border: none;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .add-person button:hover {
+            background-color: #45a049;
+        }
+        td select {
+            width: 100%;
+            padding: 3px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        td input[type="checkbox"] {
+            transform: scale(1.2);
+            margin-right: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>청소판</h1>
+    <div class="add-person">
+        <label for="personName">이름 입력:&nbsp;</label>
+        <input type="text" id="personName" placeholder="이름을 입력하세요">
+        <button type="button" onclick="addPerson()">추가하기</button>
+    </div>
+    <table id="choreTable">
+        <thead>
+            <tr>
+                <th>이름</th>
+                <th>분리</th>
+                <th>좌화2</th>
+                <th>우화2</th>
+                <th>좌화3</th>
+                <th>우화3</th>
+                <th>샤워장</th>
+                <th>좌건조기</th>
+                <th>우건조기</th>
+                <th>청빠</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+    <script>
+        // 작업 정의
+        const tasks = [
+            { name: '분리', type: 'numbers', count: 6 },
+            { name: '좌화2', type: 'roles' },
+            { name: '우화2', type: 'roles' },
+            { name: '좌화3', type: 'roles' },
+            { name: '우화3', type: 'roles' },
+            { name: '샤워장', type: 'roles' },
+            { name: '좌건조기', type: 'single' },
+            { name: '우건조기', type: 'single' },
+            { name: '청빠', type: 'skip' }
+        ];
+        // 우선순위 정의
+        const tasksOrder = ['우건조기','좌건조기','샤워장','우화3','좌화3','우화2','좌화2','분리'];
+        const roleRank = { '최선임': 1, '차선임': 2, '막내': 3 };
+
+        /**
+         * 입력된 이름을 읽어 새로운 인원 행을 추가합니다.
+         */
+        function addPerson() {
+            const input = document.getElementById('personName');
+            const name = input.value.trim();
+            if (!name) {
+                alert('이름을 입력해 주세요.');
+                return;
+            }
+            input.value = '';
+            createPersonRow(name);
+        }
+
+        /**
+         * 주어진 이름으로 새 행을 생성하여 테이블에 추가합니다.
+         * @param {string} name - 이름
+         */
+        function createPersonRow(name) {
+            const tbody = document.querySelector('#choreTable tbody');
+            const tr = document.createElement('tr');
+            // 이름 셀
+            const nameCell = document.createElement('td');
+            nameCell.textContent = name;
+            tr.appendChild(nameCell);
+            // 작업 셀 생성
+            tasks.forEach(task => {
+                const td = document.createElement('td');
+                td.dataset.task = task.name;
+                if (task.type === 'numbers') {
+                    const select = document.createElement('select');
+                    const defaultOpt = document.createElement('option');
+                    defaultOpt.value = '';
+                    defaultOpt.textContent = '선택';
+                    defaultOpt.selected = true;
+                    select.appendChild(defaultOpt);
+                    for (let i = 1; i <= task.count; i++) {
+                        const opt = document.createElement('option');
+                        opt.value = i;
+                        opt.textContent = i + '번';
+                        select.appendChild(opt);
+                    }
+                    select.addEventListener('change', function() {
+                        if (this.value !== '') {
+                            clearAssignmentsExcept(tr, task.name);
+                            td.classList.add('selected');
+                        } else {
+                            td.classList.remove('selected');
+                        }
+                        const skipCheckbox = tr.querySelector('td[data-task="청빠"] input[type="checkbox"]');
+                        if (skipCheckbox && skipCheckbox.checked) {
+                            skipCheckbox.checked = false;
+                            skipCheckbox.parentElement.classList.remove('selected');
+                        }
+                        sortRows();
+                    });
+                    td.appendChild(select);
+                } else if (task.type === 'roles') {
+                    const select = document.createElement('select');
+                    const defaultOpt = document.createElement('option');
+                    defaultOpt.value = '';
+                    defaultOpt.textContent = '선택';
+                    defaultOpt.selected = true;
+                    select.appendChild(defaultOpt);
+                    ['최선임','차선임','막내'].forEach(role => {
+                        const opt = document.createElement('option');
+                        opt.value = role;
+                        opt.textContent = role;
+                        select.appendChild(opt);
+                    });
+                    select.addEventListener('change', function() {
+                        if (this.value !== '') {
+                            clearAssignmentsExcept(tr, task.name);
+                            td.classList.add('selected');
+                        } else {
+                            td.classList.remove('selected');
+                        }
+                        const skipCheckbox = tr.querySelector('td[data-task="청빠"] input[type="checkbox"]');
+                        if (skipCheckbox && skipCheckbox.checked) {
+                            skipCheckbox.checked = false;
+                            skipCheckbox.parentElement.classList.remove('selected');
+                        }
+                        sortRows();
+                    });
+                    td.appendChild(select);
+                } else if (task.type === 'single') {
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = name + '_' + task.name + '_' + Math.random().toString(36).substr(2,5);
+                    checkbox.addEventListener('change', function() {
+                        if (this.checked) {
+                            clearAssignmentsExcept(tr, task.name);
+                            td.classList.add('selected');
+                        } else {
+                            td.classList.remove('selected');
+                        }
+                        const skipCheckbox = tr.querySelector('td[data-task="청빠"] input[type="checkbox"]');
+                        if (skipCheckbox && skipCheckbox.checked) {
+                            skipCheckbox.checked = false;
+                            skipCheckbox.parentElement.classList.remove('selected');
+                        }
+                        sortRows();
+                    });
+                    const label = document.createElement('label');
+                    label.htmlFor = checkbox.id;
+                    label.textContent = '담당';
+                    td.appendChild(checkbox);
+                    td.appendChild(label);
+                } else if (task.type === 'skip') {
+                    const skipCheckbox = document.createElement('input');
+                    skipCheckbox.type = 'checkbox';
+                    skipCheckbox.id = name + '_skip_' + Math.random().toString(36).substr(2,5);
+                    skipCheckbox.addEventListener('change', function() {
+                        if (this.checked) {
+                            clearAssignments(tr);
+                            td.classList.add('selected');
+                        } else {
+                            td.classList.remove('selected');
+                        }
+                        sortRows();
+                    });
+                    const label = document.createElement('label');
+                    label.htmlFor = skipCheckbox.id;
+                    label.textContent = '청빠';
+                    td.appendChild(skipCheckbox);
+                    td.appendChild(label);
+                }
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+            sortRows();
+        }
+
+        /**
+         * 특정 행에서 주어진 작업을 제외한 모든 선택을 초기화합니다.
+         * @param {HTMLTableRowElement} row - 행
+         * @param {string} currentTask - 유지할 작업명
+         */
+        function clearAssignmentsExcept(row, currentTask) {
+            row.querySelectorAll('td').forEach(td => {
+                const t = td.dataset.task;
+                if (!t || t === '청빠' || t === currentTask) return;
+                if (t === '좌건조기' || t === '우건조기') {
+                    const cb = td.querySelector('input[type="checkbox"]');
+                    if (cb) cb.checked = false;
+                    td.classList.remove('selected');
+                } else if (t === '분리') {
+                    const select = td.querySelector('select');
+                    if (select) select.selectedIndex = 0;
+                    td.classList.remove('selected');
+                } else { // roles
+                    const select = td.querySelector('select');
+                    if (select) select.selectedIndex = 0;
+                    td.classList.remove('selected');
+                }
+            });
+        }
+
+        /**
+         * 특정 행의 모든 선택을 초기화합니다 (skip 제외).
+         * @param {HTMLTableRowElement} row - 행
+         */
+        function clearAssignments(row) {
+            row.querySelectorAll('td').forEach(td => {
+                const t = td.dataset.task;
+                if (!t || t === '청빠') return;
+                if (t === '좌건조기' || t === '우건조기') {
+                    const cb = td.querySelector('input[type="checkbox"]');
+                    if (cb) cb.checked = false;
+                    td.classList.remove('selected');
+                } else if (t === '분리') {
+                    const select = td.querySelector('select');
+                    if (select) select.selectedIndex = 0;
+                    td.classList.remove('selected');
+                } else {
+                    const select = td.querySelector('select');
+                    if (select) select.selectedIndex = 0;
+                    td.classList.remove('selected');
+                }
+            });
+        }
+
+        /**
+         * 현재 테이블의 행들을 우선순위에 따라 정렬합니다.
+         */
+        function sortRows() {
+            const tbody = document.querySelector('#choreTable tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const rowData = rows.map((row, index) => {
+                const skip = row.querySelector('td[data-task="청빠"] input[type="checkbox"]')?.checked;
+                if (skip) {
+                    return { row, rank: [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY], index };
+                }
+                let mainRank = tasksOrder.length + 1;
+                let subRank = Number.MAX_SAFE_INTEGER;
+                for (let i = 0; i < tasksOrder.length; i++) {
+                    const taskName = tasksOrder[i];
+                    const cell = row.querySelector(`td[data-task="${taskName}"]`);
+                    if (!cell) continue;
+                    if (taskName === '분리') {
+                        const select = cell.querySelector('select');
+                        const val = select?.value;
+                        if (val) {
+                            mainRank = i;
+                            subRank = parseInt(val);
+                            break;
+                        }
+                    } else if (taskName === '좌건조기' || taskName === '우건조기') {
+                        const cb = cell.querySelector('input[type="checkbox"]');
+                        if (cb && cb.checked) {
+                            mainRank = i;
+                            subRank = 0;
+                            break;
+                        }
+                    } else {
+                        const select = cell.querySelector('select');
+                        const val = select?.value;
+                        if (val) {
+                            mainRank = i;
+                            subRank = roleRank[val] || Number.MAX_SAFE_INTEGER;
+                            break;
+                        }
+                    }
+                }
+                return { row, rank: [mainRank, subRank], index };
+            });
+            rowData.sort((a,b) => {
+                if (a.rank[0] === b.rank[0]) {
+                    if (a.rank[1] === b.rank[1]) return a.index - b.index;
+                    return a.rank[1] - b.rank[1];
+                }
+                return a.rank[0] - b.rank[0];
+            });
+            rowData.forEach(item => tbody.appendChild(item.row));
+        }
+
+        // 페이지 로드 시 초기 인원 추가
+        document.addEventListener('DOMContentLoaded', () => {
+            const initialNames = [
+                '방효정','김도헌','류제경','박민성','박상민','박준영','박지환','윤건우','이승섭','이승윤','임성재','조현성','최성민','최세인'
+            ];
+            initialNames.forEach(name => createPersonRow(name));
+        });
+    </script>
+</body>
+</html>
